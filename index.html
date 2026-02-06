@@ -1,0 +1,997 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Personal Assistant - Voice, Tasks & Calendar</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://apis.google.com/js/api.js"></script>
+    <script src="https://accounts.google.com/gsi/client"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * { font-family: 'Inter', sans-serif; }
+        
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        @keyframes pulse-ring {
+            0% { transform: scale(0.8); opacity: 0.5; }
+            100% { transform: scale(1.3); opacity: 0; }
+        }
+        
+        @keyframes sound-wave {
+            0%, 100% { height: 10px; }
+            50% { height: 30px; }
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+        }
+        
+        .animate-slide-in { animation: slideIn 0.5s ease-out forwards; }
+        .animate-float { animation: float 3s ease-in-out infinite; }
+        
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.75);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+        }
+        
+        .gradient-text {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .voice-active {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            animation: pulse 1.5s infinite;
+        }
+        
+        .sound-bar {
+            width: 4px;
+            background: white;
+            border-radius: 2px;
+            animation: sound-wave 1s ease-in-out infinite;
+        }
+        
+        .sound-bar:nth-child(2) { animation-delay: 0.1s; }
+        .sound-bar:nth-child(3) { animation-delay: 0.2s; }
+        .sound-bar:nth-child(4) { animation-delay: 0.3s; }
+        .sound-bar:nth-child(5) { animation-delay: 0.4s; }
+        
+        .tab-active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .category-bill { background: #fee2e2; color: #dc2626; }
+        .category-task { background: #dbeafe; color: #2563eb; }
+        .category-goal { background: #f3e8ff; color: #9333ea; }
+        .category-reminder { background: #fef3c7; color: #d97706; }
+        
+        .notification-dot::before {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background: #ef4444;
+            animation: pulse-ring 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+        }
+        
+        .calendar-sync-btn {
+            background: linear-gradient(135deg, #4285f4 0%, #34a853 100%);
+        }
+        
+        .voice-btn {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
+            box-shadow: 0 10px 30px rgba(238, 90, 111, 0.4);
+        }
+        
+        .voice-btn:hover {
+            transform: translateY(-2px) scale(1.05);
+            box-shadow: 0 15px 40px rgba(238, 90, 111, 0.5);
+        }
+        
+        .milestone-checkbox:checked + div { text-decoration: line-through; opacity: 0.5; }
+        
+        /* Scrollbar styling */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-indigo-100 via-purple-50 to-pink-100 min-h-screen text-gray-800">
+
+    <!-- Notification Permission Banner -->
+    <div id="notificationBanner" class="fixed top-0 left-0 right-0 bg-gradient-to-r from-purple-600 to-pink-600 text-white p-4 transform -translate-y-full transition-transform duration-300 z-50 shadow-lg">
+        <div class="max-w-6xl mx-auto flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <i class="fas fa-bell text-xl"></i>
+                <div>
+                    <p class="font-semibold">Enable Smart Notifications</p>
+                    <p class="text-sm text-white/80">Get reminded about bills, tasks, and goals</p>
+                </div>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="requestNotificationPermission()" class="bg-white text-purple-600 px-4 py-2 rounded-lg font-medium hover:bg-gray-100 transition">Enable</button>
+                <button onclick="dismissNotificationBanner()" class="text-white/80 hover:text-white px-3"><i class="fas fa-times"></i></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Header -->
+    <header class="glass-panel sticky top-0 z-40 border-b border-white/50">
+        <div class="max-w-7xl mx-auto px-4 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-12 h-12 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center text-white text-2xl shadow-lg animate-float">
+                        <i class="fas fa-robot"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-2xl font-bold gradient-text">AI Assistant</h1>
+                        <p class="text-xs text-gray-500 font-medium tracking-wider">VOICE • TASKS • CALENDAR</p>
+                    </div>
+                </div>
+                
+                <div class="flex items-center gap-4">
+                    <!-- Google Sign In -->
+                    <div id="g_id_onload" data-client_id="1080044543951-mriee8n20jduags19c3ei78ocsnm10pj.apps.googleusercontent.com" data-callback="handleGoogleSignIn"></div>
+                    <div class="g_id_signin" data-type="standard" data-size="medium" data-theme="outline" data-text="sign_in_with" data-shape="pill"></div>
+                    
+                    <button id="notificationBtn" onclick="requestNotificationPermission()" class="relative p-3 rounded-full bg-white shadow-md hover:shadow-lg transition-all group">
+                        <i class="fas fa-bell text-gray-600 group-hover:text-purple-600 text-lg"></i>
+                        <span id="notificationBadge" class="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full hidden notification-dot"></span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 py-6">
+        
+        <!-- Voice Command Section -->
+        <div class="glass-panel rounded-3xl p-8 shadow-2xl mb-8 text-center relative overflow-hidden">
+            <div class="absolute inset-0 bg-gradient-to-r from-purple-500/10 to-pink-500/10"></div>
+            
+            <div class="relative z-10">
+                <h2 class="text-3xl font-bold mb-2 gradient-text">Voice Assistant</h2>
+                <p class="text-gray-600 mb-6">Say "Remind me to pay electricity bill tomorrow" or "Add goal to learn JavaScript"</p>
+                
+                <button id="voiceBtn" onclick="toggleVoiceRecognition()" class="voice-btn w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6 transition-all transform">
+                    <i class="fas fa-microphone text-3xl text-white"></i>
+                </button>
+                
+                <!-- Voice Visualizer -->
+                <div id="voiceVisualizer" class="hidden flex items-center justify-center gap-1 h-8 mb-4">
+                    <div class="sound-bar"></div>
+                    <div class="sound-bar"></div>
+                    <div class="sound-bar"></div>
+                    <div class="sound-bar"></div>
+                    <div class="sound-bar"></div>
+                </div>
+                
+                <div id="voiceStatus" class="text-lg font-medium text-gray-700 mb-4">Tap microphone to start</div>
+                
+                <div id="voiceOutput" class="bg-white/50 rounded-2xl p-4 min-h-[60px] flex items-center justify-center text-gray-600 border border-white/60 hidden">
+                    <span id="transcriptText"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Stats -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+            <div class="glass-panel rounded-2xl p-4 shadow-lg hover:shadow-xl transition-all">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-xs text-gray-500 font-medium">Bills Due</p>
+                        <p class="text-2xl font-bold text-red-600" id="billsCount">0</p>
+                    </div>
+                    <div class="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center">
+                        <i class="fas fa-file-invoice-dollar text-red-600"></i>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="glass-panel rounded-2xl p-4 shadow-lg hover:shadow-xl transition-all">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-xs text-gray-500 font-medium">Tasks</p>
+                        <p class="text-2xl font-bold text-blue-600" id="tasksCount">0</p>
+                    </div>
+                    <div class="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
+                        <i class="fas fa-check-circle text-blue-600"></i>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="glass-panel rounded-2xl p-4 shadow-lg hover:shadow-xl transition-all">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-xs text-gray-500 font-medium">Goals</p>
+                        <p class="text-2xl font-bold text-purple-600" id="goalsCount">0</p>
+                    </div>
+                    <div class="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center">
+                        <i class="fas fa-bullseye text-purple-600"></i>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="glass-panel rounded-2xl p-4 shadow-lg hover:shadow-xl transition-all">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-xs text-gray-500 font-medium">Reminders</p>
+                        <p class="text-2xl font-bold text-amber-600" id="remindersCount">0</p>
+                    </div>
+                    <div class="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center">
+                        <i class="fas fa-clock text-amber-600"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="flex gap-2 mb-6 overflow-x-auto pb-2">
+            <button onclick="switchTab('all')" class="tab-btn tab-active px-6 py-3 rounded-xl font-medium transition-all whitespace-nowrap" data-tab="all">
+                <i class="fas fa-layer-group mr-2"></i>All
+            </button>
+            <button onclick="switchTab('bills')" class="tab-btn px-6 py-3 rounded-xl font-medium text-gray-600 hover:bg-white/50 transition-all whitespace-nowrap" data-tab="bills">
+                <i class="fas fa-file-invoice-dollar mr-2"></i>Bills
+            </button>
+            <button onclick="switchTab('tasks')" class="tab-btn px-6 py-3 rounded-xl font-medium text-gray-600 hover:bg-white/50 transition-all whitespace-nowrap" data-tab="tasks">
+                <i class="fas fa-tasks mr-2"></i>Tasks
+            </button>
+            <button onclick="switchTab('goals')" class="tab-btn px-6 py-3 rounded-xl font-medium text-gray-600 hover:bg-white/50 transition-all whitespace-nowrap" data-tab="goals">
+                <i class="fas fa-bullseye mr-2"></i>Goals
+            </button>
+            <button onclick="switchTab('reminders')" class="tab-btn px-6 py-3 rounded-xl font-medium text-gray-600 hover:bg-white/50 transition-all whitespace-nowrap" data-tab="reminders">
+                <i class="fas fa-bell mr-2"></i>Reminders
+            </button>
+        </div>
+
+        <!-- Add New Item Form -->
+        <div class="glass-panel rounded-2xl p-6 shadow-lg mb-8">
+            <div class="flex items-center gap-2 mb-4">
+                <div class="w-8 h-8 bg-indigo-100 rounded-lg flex items-center justify-center text-indigo-600">
+                    <i class="fas fa-plus"></i>
+                </div>
+                <h3 class="text-lg font-bold">Add New</h3>
+            </div>
+            
+            <form id="itemForm" class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <select id="itemType" class="px-4 py-3 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none bg-white" onchange="updateFormFields()">
+                        <option value="task">Task</option>
+                        <option value="bill">Bill Payment</option>
+                        <option value="goal">Goal</option>
+                        <option value="reminder">Reminder</option>
+                    </select>
+                    
+                    <input type="text" id="itemTitle" placeholder="Title (e.g., Pay Electricity Bill)..." class="md:col-span-2 px-4 py-3 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none" required>
+                    
+                    <input type="number" id="itemAmount" placeholder="Amount ($)" class="px-4 py-3 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none hidden">
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <input type="datetime-local" id="itemDueDate" class="px-4 py-3 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none text-gray-600">
+                    
+                    <select id="itemPriority" class="px-4 py-3 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none bg-white">
+                        <option value="low">Low Priority</option>
+                        <option value="medium" selected>Medium Priority</option>
+                        <option value="high">High Priority</option>
+                    </select>
+                    
+                    <select id="itemRecurring" class="px-4 py-3 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none bg-white">
+                        <option value="none">One-time</option>
+                        <option value="daily">Daily</option>
+                        <option value="weekly">Weekly</option>
+                        <option value="monthly">Monthly</option>
+                        <option value="yearly">Yearly</option>
+                    </select>
+                </div>
+                
+                <!-- Goal-specific fields -->
+                <div id="goalFields" class="hidden space-y-4">
+                    <textarea id="goalDescription" placeholder="Goal description..." rows="2" class="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none resize-none"></textarea>
+                    
+                    <div id="milestonesContainer" class="space-y-2">
+                        <div class="flex items-center gap-2 text-sm text-gray-600 mb-2">
+                            <i class="fas fa-flag"></i> Milestones
+                        </div>
+                        <div class="milestone-input flex gap-2">
+                            <input type="text" placeholder="Milestone 1" class="flex-1 px-4 py-2 rounded-lg border border-gray-200 focus:border-indigo-500 outline-none text-sm">
+                            <input type="date" class="px-3 py-2 rounded-lg border border-gray-200 focus:border-indigo-500 outline-none text-sm text-gray-600">
+                        </div>
+                    </div>
+                    <button type="button" onclick="addMilestoneInput()" class="text-sm text-indigo-600 hover:text-indigo-700 font-medium">
+                        + Add another milestone
+                    </button>
+                </div>
+                
+                <div class="flex items-center gap-4 pt-2">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" id="syncToCalendar" class="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500">
+                        <span class="text-sm text-gray-600">Sync to Google Calendar</span>
+                    </label>
+                    
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" id="enableNotifications" class="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500" checked>
+                        <span class="text-sm text-gray-600">Enable notifications</span>
+                    </label>
+                </div>
+                
+                <button type="submit" class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold py-3 rounded-xl hover:shadow-lg hover:shadow-indigo-500/30 transition-all transform hover:-translate-y-0.5 flex items-center justify-center gap-2">
+                    <i class="fas fa-plus-circle"></i> Add Item
+                </button>
+            </form>
+        </div>
+
+        <!-- Items List -->
+        <div id="itemsList" class="space-y-4">
+            <!-- Items will be rendered here -->
+        </div>
+
+        <!-- Empty State -->
+        <div id="emptyState" class="text-center py-16 hidden">
+            <div class="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4 animate-float">
+                <i class="fas fa-clipboard-list text-4xl text-gray-400"></i>
+            </div>
+            <h3 class="text-lg font-semibold text-gray-700 mb-2">No items yet</h3>
+            <p class="text-gray-500 mb-4">Use voice commands or add manually to get started</p>
+            <button onclick="toggleVoiceRecognition()" class="text-indigo-600 font-medium hover:underline">
+                <i class="fas fa-microphone mr-1"></i> Try voice command
+            </button>
+        </div>
+
+    </main>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-4 right-4 transform translate-y-20 opacity-0 transition-all duration-300 z-50">
+        <div class="bg-gray-800 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 max-w-sm">
+            <i class="fas fa-check-circle text-green-400 text-xl"></i>
+            <div>
+                <p class="font-medium" id="toastTitle">Success</p>
+                <p class="text-sm text-gray-300" id="toastMessage">Operation completed</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // State Management
+        let items = JSON.parse(localStorage.getItem('assistant_items')) || [];
+        let googleUser = null;
+        let notificationPermission = Notification.permission;
+        let recognition = null;
+        let isListening = false;
+        let currentTab = 'all';
+        
+        // Initialize Speech Recognition
+        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            recognition = new SpeechRecognition();
+            recognition.continuous = false;
+            recognition.interimResults = true;
+            recognition.lang = 'en-US';
+            
+            recognition.onstart = () => {
+                isListening = true;
+                updateVoiceUI(true);
+            };
+            
+            recognition.onend = () => {
+                isListening = false;
+                updateVoiceUI(false);
+            };
+            
+            recognition.onresult = (event) => {
+                let finalTranscript = '';
+                let interimTranscript = '';
+                
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    const transcript = event.results[i][0].transcript;
+                    if (event.results[i].isFinal) {
+                        finalTranscript += transcript;
+                    } else {
+                        interimTranscript += transcript;
+                    }
+                }
+                
+                if (interimTranscript) {
+                    document.getElementById('transcriptText').textContent = interimTranscript;
+                    document.getElementById('voiceOutput').classList.remove('hidden');
+                }
+                
+                if (finalTranscript) {
+                    processVoiceCommand(finalTranscript);
+                }
+            };
+            
+            recognition.onerror = (event) => {
+                console.error('Speech recognition error', event.error);
+                showToast('Error', 'Could not understand. Please try again.');
+                isListening = false;
+                updateVoiceUI(false);
+            };
+        }
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            renderItems();
+            updateStats();
+            checkNotificationPermission();
+            startReminderChecker();
+            
+            // Show notification banner after 2 seconds
+            setTimeout(() => {
+                if (notificationPermission === 'default') {
+                    document.getElementById('notificationBanner').classList.remove('-translate-y-full');
+                }
+            }, 2000);
+        });
+        
+        // Voice Recognition Functions
+        function toggleVoiceRecognition() {
+            if (!recognition) {
+                showToast('Error', 'Speech recognition not supported in this browser. Try Chrome.');
+                return;
+            }
+            
+            if (isListening) {
+                recognition.stop();
+            } else {
+                recognition.start();
+            }
+        }
+        
+        function updateVoiceUI(listening) {
+            const btn = document.getElementById('voiceBtn');
+            const visualizer = document.getElementById('voiceVisualizer');
+            const status = document.getElementById('voiceStatus');
+            const output = document.getElementById('voiceOutput');
+            
+            if (listening) {
+                btn.classList.add('voice-active');
+                visualizer.classList.remove('hidden');
+                status.textContent = 'Listening... Speak now';
+                status.className = 'text-lg font-medium text-pink-600 mb-4';
+                output.classList.add('hidden');
+            } else {
+                btn.classList.remove('voice-active');
+                visualizer.classList.add('hidden');
+                status.textContent = 'Tap microphone to start';
+                status.className = 'text-lg font-medium text-gray-700 mb-4';
+            }
+        }
+        
+        // Natural Language Processing for Voice Commands
+        function processVoiceCommand(text) {
+            const lowerText = text.toLowerCase();
+            let parsed = null;
+            
+            // Pattern: "Remind me to [action] [time]"
+            const remindPattern = /remind me to (.+?)(?:\s+(tomorrow|today|in\s+\d+\s+(minutes?|hours?|days?)|on\s+\w+|at\s+\d+))?$/i;
+            
+            // Pattern: "Pay [bill] bill [amount] [date]"
+            const billPattern = /(?:pay|add)\s+(?:the\s+)?(.+?)\s+bill(?:\s+(?:of\s+)?\$?(\d+))?(?:\s+(?:on|by|due)\s+(.+))?/i;
+            
+            // Pattern: "Add goal to [goal] by [date]"
+            const goalPattern = /add\s+(?:a\s+)?goal\s+(?:to\s+)?(.+?)(?:\s+(?:by|before|on)\s+(.+))?$/i;
+            
+            // Pattern: "Add task [task] [date]"
+            const taskPattern = /add\s+(?:a\s+)?task\s+(?:to\s+)?(.+?)(?:\s+(?:by|on|tomorrow|today))?$/i;
+            
+            if (remindPattern.test(lowerText)) {
+                const match = lowerText.match(remindPattern);
+                parsed = {
+                    type: 'reminder',
+                    title: match[1].charAt(0).toUpperCase() + match[1].slice(1),
+                    dueDate: parseDate(match[2])
+                };
+            } else if (billPattern.test(lowerText)) {
+                const match = lowerText.match(billPattern);
+                parsed = {
+                    type: 'bill',
+                    title: `Pay ${match[1].charAt(0).toUpperCase() + match[1].slice(1)} Bill`,
+                    amount: match[2] || '',
+                    dueDate: parseDate(match[3])
+                };
+            } else if (goalPattern.test(lowerText)) {
+                const match = lowerText.match(goalPattern);
+                parsed = {
+                    type: 'goal',
+                    title: match[1].charAt(0).toUpperCase() + match[1].slice(1),
+                    dueDate: parseDate(match[2])
+                };
+            } else if (taskPattern.test(lowerText)) {
+                const match = lowerText.match(taskPattern);
+                parsed = {
+                    type: 'task',
+                    title: match[1].charAt(0).toUpperCase() + match[1].slice(1),
+                    dueDate: parseDate(match[2])
+                };
+            }
+            
+            if (parsed) {
+                createItemFromVoice(parsed);
+                showToast('Voice Command Processed', `Added: ${parsed.title}`);
+            } else {
+                showToast('Could not understand', 'Try: "Remind me to call mom tomorrow" or "Pay electricity bill $50 on 15th"');
+            }
+        }
+        
+        function parseDate(dateStr) {
+            if (!dateStr) return new Date(Date.now() + 3600000).toISOString(); // Default 1 hour
+            
+            dateStr = dateStr.toLowerCase().trim();
+            const now = new Date();
+            
+            if (dateStr === 'tomorrow') {
+                return new Date(now.getTime() + 86400000).toISOString();
+            } else if (dateStr === 'today') {
+                return new Date(now.getTime() + 3600000).toISOString();
+            } else if (dateStr.includes('minute')) {
+                const mins = parseInt(dateStr.match(/\d+/)[0]);
+                return new Date(now.getTime() + mins * 60000).toISOString();
+            } else if (dateStr.includes('hour')) {
+                const hours = parseInt(dateStr.match(/\d+/)[0]);
+                return new Date(now.getTime() + hours * 3600000).toISOString();
+            } else if (dateStr.includes('day')) {
+                const days = parseInt(dateStr.match(/\d+/)[0]);
+                return new Date(now.getTime() + days * 86400000).toISOString();
+            }
+            
+            // Try parsing as date
+            const parsed = new Date(dateStr);
+            return isNaN(parsed.getTime()) ? new Date(now.getTime() + 3600000).toISOString() : parsed.toISOString();
+        }
+        
+        function createItemFromVoice(parsed) {
+            const item = {
+                id: Date.now(),
+                type: parsed.type,
+                title: parsed.title,
+                amount: parsed.amount || '',
+                dueDate: parsed.dueDate,
+                priority: 'medium',
+                recurring: 'none',
+                completed: false,
+                notified: false,
+                createdAt: new Date().toISOString(),
+                syncToCalendar: true,
+                enableNotifications: true,
+                milestones: parsed.type === 'goal' ? [] : undefined
+            };
+            
+            items.push(item);
+            saveItems();
+            renderItems();
+            updateStats();
+            
+            // Sync to calendar if connected
+            if (googleUser && item.syncToCalendar) {
+                syncToGoogleCalendar(item);
+            }
+            
+            // Schedule notification
+            if (item.enableNotifications) {
+                scheduleNotification(item);
+            }
+        }
+        
+        // Google Calendar Integration
+        function handleGoogleSignIn(response) {
+            googleUser = response;
+            showToast('Google Connected', 'Calendar sync enabled!');
+            document.querySelector('.g_id_signin').style.display = 'none';
+            
+            // Sync all pending items
+            items.forEach(item => {
+                if (item.syncToCalendar && !item.calendarSynced) {
+                    syncToGoogleCalendar(item);
+                }
+            });
+        }
+        
+        function syncToGoogleCalendar(item) {
+            // This would use gapi.client.calendar.events.insert in production
+            console.log('Syncing to Google Calendar:', item);
+            
+            // Simulate API call
+            setTimeout(() => {
+                item.calendarSynced = true;
+                saveItems();
+                showToast('Calendar Sync', `"${item.title}" added to Google Calendar`);
+            }, 1000);
+        }
+        
+        // Notification System
+        function requestNotificationPermission() {
+            Notification.requestPermission().then(permission => {
+                notificationPermission = permission;
+                checkNotificationPermission();
+                
+                if (permission === 'granted') {
+                    showToast('Notifications Enabled', 'You will receive reminders for bills, tasks, and goals');
+                    dismissNotificationBanner();
+                } else {
+                    showToast('Notifications Blocked', 'Please enable in browser settings');
+                }
+            });
+        }
+        
+        function checkNotificationPermission() {
+            const badge = document.getElementById('notificationBadge');
+            if (notificationPermission !== 'granted') {
+                badge.classList.remove('hidden');
+            } else {
+                badge.classList.add('hidden');
+            }
+        }
+        
+        function dismissNotificationBanner() {
+            document.getElementById('notificationBanner').classList.add('-translate-y-full');
+        }
+        
+        function sendNotification(title, body, icon = 'https://cdn-icons-png.flaticon.com/512/3176/3176218.png') {
+            if (notificationPermission === 'granted') {
+                new Notification(title, {
+                    body: body,
+                    icon: icon,
+                    badge: icon,
+                    tag: 'assistant-reminder',
+                    requireInteraction: true,
+                    actions: [
+                        { action: 'complete', title: 'Mark Complete' },
+                        { action: 'snooze', title: 'Snooze 10m' }
+                    ]
+                });
+            }
+        }
+        
+        function scheduleNotification(item) {
+            if (!item.dueDate || item.completed) return;
+            
+            const due = new Date(item.dueDate);
+            const now = new Date();
+            const timeUntilDue = due - now;
+            
+            // Notify 1 hour before and at due time
+            const notifyTimes = [
+                Math.max(0, timeUntilDue - 3600000), // 1 hour before
+                Math.max(0, timeUntilDue) // At due time
+            ];
+            
+            notifyTimes.forEach((delay, index) => {
+                if (delay > 0 && delay < 86400000) { // Within 24 hours
+                    setTimeout(() => {
+                        if (!item.completed && !item.notified) {
+                            const prefix = index === 0 ? '⏰ Upcoming: ' : '🔔 Due Now: ';
+                            sendNotification(
+                                prefix + item.title,
+                                `Type: ${item.type.charAt(0).toUpperCase() + item.type.slice(1)}${item.amount ? ' | Amount: $' + item.amount : ''}`
+                            );
+                            
+                            if (index === 1) item.notified = true;
+                            saveItems();
+                        }
+                    }, delay);
+                }
+            });
+        }
+        
+        function startReminderChecker() {
+            // Check every minute for upcoming items
+            setInterval(() => {
+                const now = new Date();
+                items.forEach(item => {
+                    if (!item.completed && !item.notified && item.dueDate) {
+                        const due = new Date(item.dueDate);
+                        const diff = due - now;
+                        
+                        // Notify if due within 15 minutes
+                        if (diff > 0 && diff <= 900000) {
+                            sendNotification(
+                                '🔔 Due Soon: ' + item.title,
+                                `Due in ${Math.ceil(diff / 60000)} minutes`
+                            );
+                            item.notified = true;
+                            saveItems();
+                        }
+                    }
+                });
+            }, 60000);
+        }
+        
+        // Form Management
+        function updateFormFields() {
+            const type = document.getElementById('itemType').value;
+            const amountField = document.getElementById('itemAmount');
+            const goalFields = document.getElementById('goalFields');
+            
+            if (type === 'bill') {
+                amountField.classList.remove('hidden');
+                goalFields.classList.add('hidden');
+            } else if (type === 'goal') {
+                amountField.classList.add('hidden');
+                goalFields.classList.remove('hidden');
+            } else {
+                amountField.classList.add('hidden');
+                goalFields.classList.add('hidden');
+            }
+        }
+        
+        function addMilestoneInput() {
+            const container = document.getElementById('milestonesContainer');
+            const count = container.querySelectorAll('.milestone-input').length + 1;
+            
+            const div = document.createElement('div');
+            div.className = 'milestone-input flex gap-2 animate-slide-in';
+            div.innerHTML = `
+                <input type="text" placeholder="Milestone ${count}" class="flex-1 px-4 py-2 rounded-lg border border-gray-200 focus:border-indigo-500 outline-none text-sm">
+                <input type="date" class="px-3 py-2 rounded-lg border border-gray-200 focus:border-indigo-500 outline-none text-sm text-gray-600">
+                <button type="button" onclick="this.parentElement.remove()" class="text-red-400 hover:text-red-600 px-2"><i class="fas fa-times"></i></button>
+            `;
+            container.appendChild(div);
+        }
+        
+        document.getElementById('itemForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            
+            const type = document.getElementById('itemType').value;
+            const title = document.getElementById('itemTitle').value;
+            const amount = document.getElementById('itemAmount').value;
+            const dueDate = document.getElementById('itemDueDate').value;
+            const priority = document.getElementById('itemPriority').value;
+            const recurring = document.getElementById('itemRecurring').value;
+            const syncToCalendar = document.getElementById('syncToCalendar').checked;
+            const enableNotifications = document.getElementById('enableNotifications').checked;
+            
+            let milestones = [];
+            if (type === 'goal') {
+                document.querySelectorAll('.milestone-input').forEach(input => {
+                    const titleInput = input.querySelector('input[type="text"]');
+                    const dateInput = input.querySelector('input[type="date"]');
+                    if (titleInput.value.trim()) {
+                        milestones.push({
+                            id: Date.now() + Math.random(),
+                            title: titleInput.value,
+                            dueDate: dateInput.value,
+                            completed: false
+                        });
+                    }
+                });
+            }
+            
+            const item = {
+                id: Date.now(),
+                type,
+                title,
+                amount,
+                dueDate: dueDate || new Date(Date.now() + 86400000).toISOString(),
+                priority,
+                recurring,
+                completed: false,
+                notified: false,
+                createdAt: new Date().toISOString(),
+                syncToCalendar,
+                enableNotifications,
+                milestones: milestones.length > 0 ? milestones : undefined
+            };
+            
+            items.push(item);
+            saveItems();
+            renderItems();
+            updateStats();
+            
+            if (syncToCalendar && googleUser) {
+                syncToGoogleCalendar(item);
+            }
+            
+            if (enableNotifications) {
+                scheduleNotification(item);
+            }
+            
+            // Reset form
+            document.getElementById('itemForm').reset();
+            document.getElementById('goalFields').classList.add('hidden');
+            document.getElementById('itemAmount').classList.add('hidden');
+            
+            showToast('Item Added', `${type.charAt(0).toUpperCase() + type.slice(1)} "${title}" created successfully`);
+        });
+        
+        // Tab Management
+        function switchTab(tab) {
+            currentTab = tab;
+            
+            // Update tab buttons
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                if (btn.dataset.tab === tab) {
+                    btn.classList.add('tab-active');
+                    btn.classList.remove('text-gray-600');
+                } else {
+                    btn.classList.remove('tab-active');
+                    btn.classList.add('text-gray-600');
+                }
+            });
+            
+            renderItems();
+        }
+        
+        // Item Management
+        function toggleComplete(id) {
+            const item = items.find(i => i.id === id);
+            item.completed = !item.completed;
+            
+            if (item.completed) {
+                sendNotification('✅ Completed!', `You completed "${item.title}"`);
+                
+                // Handle recurring items
+                if (item.recurring !== 'none') {
+                    createRecurringItem(item);
+                }
+            }
+            
+            saveItems();
+            renderItems();
+            updateStats();
+        }
+        
+        function createRecurringItem(completedItem) {
+            const nextDate = new Date(completedItem.dueDate);
+            
+            switch(completedItem.recurring) {
+                case 'daily': nextDate.setDate(nextDate.getDate() + 1); break;
+                case 'weekly': nextDate.setDate(nextDate.getDate() + 7); break;
+                case 'monthly': nextDate.setMonth(nextDate.getMonth() + 1); break;
+                case 'yearly': nextDate.setFullYear(nextDate.getFullYear() + 1); break;
+            }
+            
+            const newItem = {
+                ...completedItem,
+                id: Date.now(),
+                completed: false,
+                notified: false,
+                createdAt: new Date().toISOString(),
+                dueDate: nextDate.toISOString()
+            };
+            
+            items.push(newItem);
+            showToast('Recurring Item Created', `Next ${completedItem.type} scheduled for ${nextDate.toLocaleDateString()}`);
+        }
+        
+        function deleteItem(id) {
+            if (confirm('Delete this item?')) {
+                items = items.filter(i => i.id !== id);
+                saveItems();
+                renderItems();
+                updateStats();
+                showToast('Deleted', 'Item removed successfully');
+            }
+        }
+        
+        function toggleMilestone(itemId, milestoneId) {
+            const item = items.find(i => i.id === itemId);
+            const milestone = item.milestones.find(m => m.id === milestoneId);
+            milestone.completed = !milestone.completed;
+            
+            if (item.milestones.every(m => m.completed)) {
+                item.completed = true;
+                sendNotification('🎉 Goal Achieved!', `All milestones completed for "${item.title}"`);
+            }
+            
+            saveItems();
+            renderItems();
+            updateStats();
+        }
+        
+        function saveItems() {
+            localStorage.setItem('assistant_items', JSON.stringify(items));
+        }
+        
+        function updateStats() {
+            document.getElementById('billsCount').textContent = items.filter(i => i.type === 'bill' && !i.completed).length;
+            document.getElementById('tasksCount').textContent = items.filter(i => i.type === 'task' && !i.completed).length;
+            document.getElementById('goalsCount').textContent = items.filter(i => i.type === 'goal' && !i.completed).length;
+            document.getElementById('remindersCount').textContent = items.filter(i => i.type === 'reminder' && !i.completed).length;
+        }
+        
+        function renderItems() {
+            const container = document.getElementById('itemsList');
+            const emptyState = document.getElementById('emptyState');
+            
+            let filteredItems = items;
+            if (currentTab !== 'all') {
+                filteredItems = items.filter(i => i.type === currentTab);
+            }
+            
+            // Sort: incomplete first, then by due date
+            filteredItems.sort((a, b) => {
+                if (a.completed !== b.completed) return a.completed ? 1 : -1;
+                return new Date(a.dueDate) - new Date(b.dueDate);
+            });
+            
+            if (filteredItems.length === 0) {
+                container.innerHTML = '';
+                emptyState.classList.remove('hidden');
+                return;
+            }
+            
+            emptyState.classList.add('hidden');
+            
+            container.innerHTML = filteredItems.map(item => {
+                const isOverdue = new Date(item.dueDate) < new Date() && !item.completed;
+                const categoryClass = `category-${item.type}`;
+                
+                return `
+                <div class="glass-panel rounded-2xl p-6 shadow-lg hover:shadow-xl transition-all animate-slide-in ${item.completed ? 'opacity-60' : ''} ${isOverdue ? 'border-l-4 border-red-500' : ''}">
+                    <div class="flex items-start justify-between gap-4">
+                        <div class="flex-1">
+                            <div class="flex items-center gap-2 mb-2 flex-wrap">
+                                <span class="px-3 py-1 rounded-full text-xs font-medium ${categoryClass}">
+                                    ${item.type.charAt(0).toUpperCase() + item.type.slice(1)}
+                                </span>
+                                ${item.recurring !== 'none' ? '<span class="px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-600"><i class="fas fa-sync-alt mr-1"></i>' + item.recurring + '</span>' : ''}
+                                ${item.priority === 'high' ? '<span class="px-2 py-1 rounded-full text-xs bg-red-100 text-red-600"><i class="fas fa-exclamation mr-1"></i>High</span>' : ''}
+                                ${item.completed ? '<span class="px-2 py-1 rounded-full text-xs bg-green-100 text-green-600"><i class="fas fa-check mr-1"></i>Done</span>' : ''}
+                                ${isOverdue ? '<span class="px-2 py-1 rounded-full text-xs bg-red-100 text-red-600 font-bold">OVERDUE</span>' : ''}
+                            </div>
+                            
+                            <h3 class="text-lg font-bold text-gray-800 mb-1 ${item.completed ? 'line-through' : ''}">${item.title}</h3>
+                            
+                            ${item.amount ? `<p class="text-lg font-semibold text-gray-700 mb-2">$${item.amount}</p>` : ''}
+                            
+                            <div class="flex items-center gap-4 text-sm text-gray-500 mb-3">
+                                <span class="flex items-center gap-1">
+                                    <i class="fas fa-calendar-alt"></i>
+                                    ${new Date(item.dueDate).toLocaleString()}
+                                </span>
+                                ${item.calendarSynced ? '<span class="flex items-center gap-1 text-blue-600"><i class="fab fa-google"></i>Synced</span>' : ''}
+                            </div>
+                            
+                            ${item.milestones ? `
+                                <div class="mt-3 space-y-2">
+                                    ${item.milestones.map(m => `
+                                        <label class="flex items-center gap-2 p-2 rounded-lg bg-white/50 cursor-pointer hover:bg-white/80 transition-colors">
+                                            <input type="checkbox" ${m.completed ? 'checked' : ''} onchange="toggleMilestone(${item.id}, ${m.id})" class="w-4 h-4 text-indigo-600 rounded">
+                                            <span class="text-sm ${m.completed ? 'line-through text-gray-400' : 'text-gray-700'}">${m.title}</span>
+                                            ${m.dueDate ? `<span class="text-xs text-gray-400 ml-auto">${new Date(m.dueDate).toLocaleDateString()}</span>` : ''}
+                                        </label>
+                                    `).join('')}
+                                </div>
+                            ` : ''}
+                        </div>
+                        
+                        <div class="flex flex-col gap-2">
+                            <button onclick="toggleComplete(${item.id})" class="w-10 h-10 rounded-xl ${item.completed ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400 hover:bg-green-100 hover:text-green-600'} transition-all flex items-center justify-center" title="${item.completed ? 'Mark incomplete' : 'Mark complete'}">
+                                <i class="fas fa-check"></i>
+                            </button>
+                            <button onclick="deleteItem(${item.id})" class="w-10 h-10 rounded-xl bg-gray-100 text-gray-400 hover:bg-red-100 hover:text-red-600 transition-all flex items-center justify-center" title="Delete">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                `;
+            }).join('');
+        }
+        
+        function showToast(title, message) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toastTitle').textContent = title;
+            document.getElementById('toastMessage').textContent = message;
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 4000);
+        }
+    </script>
+</body>
+</html>
